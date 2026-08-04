@@ -5,7 +5,7 @@
 <h1>Checkout</h1>
 
 <c:choose>
-    <c:when test="${cart.empty}">
+    <c:when test="${empty cart.items}">
         <div class="card">
             <p class="muted">Your cart is empty.</p>
             <a class="button" href="${ctx}/products">Browse products</a>
