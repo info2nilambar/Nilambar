@@ -2,51 +2,60 @@ package com.nilambar.erp;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.nilambar.erp.domain.CustomerOrder;
 import com.nilambar.erp.domain.FulfilmentType;
 import com.nilambar.erp.domain.OrderStatus;
 import com.nilambar.erp.domain.Product;
+import com.nilambar.erp.repository.AddressRepository;
 import com.nilambar.erp.repository.CartRepository;
 import com.nilambar.erp.repository.OrderRepository;
 import com.nilambar.erp.repository.ProductRepository;
 import com.nilambar.erp.repository.UserRepository;
-import com.nilambar.erp.service.delivery.DeliveryQuote;
 import com.nilambar.erp.service.otp.OtpSender;
+import java.io.IOException;
+import java.math.BigDecimal;
+import java.net.CookieManager;
+import java.net.CookiePolicy;
+import java.net.URI;
+import java.net.URLEncoder;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
-import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
-import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.setup.MockMvcBuilders;
-import org.springframework.web.context.WebApplicationContext;
 import org.testcontainers.containers.KafkaContainer;
 import org.testcontainers.containers.MySQLContainer;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
 
 /**
- * Exercises the full registration -> address -> cart -> checkout -> order path against real MySQL
- * and Kafka containers.
+ * Drives the full registration -> address -> cart -> checkout -> order path over real HTTP against
+ * real MySQL and Kafka containers. Real requests are used rather than MockMvc so that every JSP is
+ * actually compiled and rendered; EL mistakes only surface at request time.
  */
-@SpringBootTest
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @Testcontainers
 @Import(RegistrationToOrderIT.RecordingSenderConfig.class)
 class RegistrationToOrderIT {
+
+    private static final Pattern CSRF = Pattern.compile("name=\"_csrf\" value=\"([^\"]+)\"");
 
     private static final MySQLContainer<?> MYSQL = new MySQLContainer<>(DockerImageName.parse("mysql:8.0"))
             .withDatabaseName("erpdb");
@@ -68,8 +77,8 @@ class RegistrationToOrderIT {
         registry.add("erp.fulfilment.simulate", () -> "false");
     }
 
-    @Autowired
-    private WebApplicationContext context;
+    @LocalServerPort
+    private int port;
 
     @Autowired
     private RecordingOtpSender otpSender;
@@ -86,65 +95,45 @@ class RegistrationToOrderIT {
     @Autowired
     private CartRepository cartRepository;
 
+    @Autowired
+    private AddressRepository addressRepository;
+
     @Test
-    void registeredUserInsideRadiusCanPlaceAHomeDeliveryOrder() throws Exception {
-        MockMvc mockMvc = MockMvcBuilders.webAppContextSetup(context).build();
-        MockHttpSession session = new MockHttpSession();
+    void addressInsideRadiusCanCheckOutWithHomeDelivery() throws Exception {
+        Browser browser = new Browser();
         String mobile = "9800000001";
-
-        mockMvc.perform(post("/auth/otp/request").with(csrf()).session(session).param("mobile", mobile))
-                .andExpect(status().is3xxRedirection());
-
-        mockMvc.perform(post("/auth/otp/verify").with(csrf()).session(session)
-                        .param("mobile", mobile)
-                        .param("code", otpSender.lastCode()))
-                .andExpect(redirectedUrl("/profile/complete"));
-
-        mockMvc.perform(post("/profile/complete").with(csrf()).session(session)
-                        .param("name", "Nilambar")
-                        .param("email", "nilambar@example.com")
-                        .param("address.label", "Home")
-                        .param("address.line1", "24 Church Street")
-                        .param("address.city", "Bengaluru")
-                        .param("address.state", "Karnataka")
-                        .param("address.pincode", "560001")
-                        .param("address.latitude", "12.9750")
-                        .param("address.longitude", "77.6070"))
-                .andExpect(redirectedUrl("/products"));
-
-        assertThat(userRepository.findByMobile(mobile)).get()
-                .extracting("profileCompleted").isEqualTo(true);
+        signIn(browser, mobile);
+        completeProfile(browser, "Nilambar", "Home", "24 Church Street", "Bengaluru", "560001",
+                "12.9750", "77.6070");
 
         Product product = productRepository.findAll().get(0);
         int stockBefore = product.getStockQuantity();
 
-        mockMvc.perform(post("/cart/add").with(csrf()).session(session)
-                        .param("productId", product.getId().toString())
-                        .param("quantity", "2"))
-                .andExpect(redirectedUrl("/cart"));
+        assertThat(browser.get("/products")).contains("Page 1 of");
+        assertThat(browser.get("/products?q=" + URLEncoder.encode(product.getName(), StandardCharsets.UTF_8)))
+                .contains(product.getName());
+        assertThat(browser.get("/products/" + product.getId())).contains("Add to cart");
 
-        DeliveryQuote quote = (DeliveryQuote) mockMvc.perform(get("/checkout").session(session))
-                .andExpect(status().isOk())
-                .andExpect(model().attributeExists("quote"))
-                .andReturn().getModelAndView().getModel().get("quote");
-        assertThat(quote.homeDeliveryAvailable()).isTrue();
+        browser.post("/cart/add", Map.of("productId", product.getId().toString(), "quantity", "2"));
+        assertThat(browser.get("/cart")).contains(product.getName());
 
-        Long addressId = orderAddressId(session, mockMvc);
+        String checkout = browser.get("/checkout");
+        assertThat(checkout).contains("Home delivery available");
 
-        mockMvc.perform(post("/checkout/place").with(csrf()).session(session)
-                        .param("addressId", addressId.toString())
-                        .param("fulfilmentType", "HOME_DELIVERY"))
-                .andExpect(redirectedUrl("/orders"));
+        browser.post("/checkout/place", Map.of("addressId", addressId(mobile).toString(),
+                "fulfilmentType", "HOME_DELIVERY"));
 
-        List<CustomerOrder> orders = orderRepository.findAll();
-        assertThat(orders).hasSize(1);
-        CustomerOrder order = orders.get(0);
+        CustomerOrder order = onlyOrderOf(mobile);
         assertThat(order.getFulfilmentType()).isEqualTo(FulfilmentType.HOME_DELIVERY);
         assertThat(order.getItems()).hasSize(1);
-        assertThat(order.getTotal()).isEqualByComparingTo(product.getPrice().multiply(java.math.BigDecimal.valueOf(2)));
+        assertThat(order.getTotal()).isEqualByComparingTo(product.getPrice().multiply(BigDecimal.valueOf(2)));
+        assertThat(order.getDistanceKm()).isLessThanOrEqualTo(5);
         assertThat(productRepository.findById(product.getId()).orElseThrow().getStockQuantity())
                 .isEqualTo(stockBefore - 2);
         assertThat(cartRepository.findByUserId(order.getUser().getId()).orElseThrow().getItems()).isEmpty();
+
+        assertThat(browser.get("/orders")).contains(order.getOrderNumber());
+        assertThat(browser.get("/orders/" + order.getId())).contains(product.getName());
 
         // The Kafka consumer advances the order out of PLACED once it receives order.placed.
         await().atMost(Duration.ofSeconds(30)).untilAsserted(() ->
@@ -153,54 +142,122 @@ class RegistrationToOrderIT {
     }
 
     @Test
-    void addressBeyondTheRadiusCannotUseHomeDelivery() throws Exception {
-        MockMvc mockMvc = MockMvcBuilders.webAppContextSetup(context).build();
-        MockHttpSession session = new MockHttpSession();
+    void addressBeyondRadiusIsRefusedHomeDeliveryEvenIfThePostSaysOtherwise() throws Exception {
+        Browser browser = new Browser();
         String mobile = "9800000002";
-
-        mockMvc.perform(post("/auth/otp/request").with(csrf()).session(session).param("mobile", mobile));
-        mockMvc.perform(post("/auth/otp/verify").with(csrf()).session(session)
-                .param("mobile", mobile).param("code", otpSender.lastCode()));
-
-        mockMvc.perform(post("/profile/complete").with(csrf()).session(session)
-                        .param("name", "Far Away")
-                        .param("address.label", "Farm")
-                        .param("address.line1", "Outskirts")
-                        .param("address.city", "Bengaluru Rural")
-                        .param("address.state", "Karnataka")
-                        .param("address.pincode", "562123")
-                        .param("address.latitude", "13.2000")
-                        .param("address.longitude", "77.8000"))
-                .andExpect(redirectedUrl("/products"));
+        signIn(browser, mobile);
+        completeProfile(browser, "Far Away", "Farm", "Outskirts", "Bengaluru Rural", "562123",
+                "13.2000", "77.8000");
 
         Product product = productRepository.findAll().get(1);
-        mockMvc.perform(post("/cart/add").with(csrf()).session(session)
-                .param("productId", product.getId().toString())
-                .param("quantity", "1"));
+        browser.post("/cart/add", Map.of("productId", product.getId().toString(), "quantity", "1"));
 
-        DeliveryQuote quote = (DeliveryQuote) mockMvc.perform(get("/checkout").session(session))
-                .andReturn().getModelAndView().getModel().get("quote");
-        assertThat(quote.homeDeliveryAvailable()).isFalse();
-        assertThat(quote.fulfilmentType()).isEqualTo(FulfilmentType.STORE_PICKUP);
+        String checkout = browser.get("/checkout");
+        assertThat(checkout).contains("Outside the home-delivery radius");
+        assertThat(checkout).contains("Store pickup");
 
-        Long addressId = orderAddressId(session, mockMvc);
+        Long addressId = addressId(mobile);
+        browser.post("/checkout/place", Map.of("addressId", addressId.toString(),
+                "fulfilmentType", "HOME_DELIVERY"));
+        assertThat(ordersOf(mobile)).isEmpty();
 
-        // The browser is not trusted: posting HOME_DELIVERY anyway must be rejected.
-        mockMvc.perform(post("/checkout/place").with(csrf()).session(session)
-                        .param("addressId", addressId.toString())
-                        .param("fulfilmentType", "HOME_DELIVERY"))
-                .andExpect(status().is3xxRedirection());
-
-        Long userId = userRepository.findByMobile(mobile).orElseThrow().getId();
-        assertThat(orderRepository.findAll().stream()
-                .filter(order -> order.getUser().getId().equals(userId)))
-                .isEmpty();
+        browser.post("/checkout/place", Map.of("addressId", addressId.toString(),
+                "fulfilmentType", "STORE_PICKUP"));
+        CustomerOrder order = onlyOrderOf(mobile);
+        assertThat(order.getFulfilmentType()).isEqualTo(FulfilmentType.STORE_PICKUP);
+        assertThat(order.getDistanceKm()).isGreaterThan(5);
     }
 
-    private Long orderAddressId(MockHttpSession session, MockMvc mockMvc) throws Exception {
-        Object addresses = mockMvc.perform(get("/checkout").session(session))
-                .andReturn().getModelAndView().getModel().get("selectedAddress");
-        return ((com.nilambar.erp.domain.Address) addresses).getId();
+    private void signIn(Browser browser, String mobile) throws Exception {
+        assertThat(browser.get("/auth/login")).contains("Mobile number");
+        browser.post("/auth/otp/request", Map.of("mobile", mobile));
+        assertThat(browser.get("/auth/verify?mobile=" + mobile)).contains("OTP");
+        browser.post("/auth/otp/verify", Map.of("mobile", mobile, "code", otpSender.lastCode()));
+        assertThat(userRepository.findByMobile(mobile)).isPresent();
+    }
+
+    private void completeProfile(Browser browser, String name, String label, String line1, String city,
+            String pincode, String latitude, String longitude) throws Exception {
+        assertThat(browser.get("/profile/complete")).contains("Complete your profile");
+        Map<String, String> form = new LinkedHashMap<>();
+        form.put("name", name);
+        form.put("address.label", label);
+        form.put("address.line1", line1);
+        form.put("address.city", city);
+        form.put("address.state", "Karnataka");
+        form.put("address.pincode", pincode);
+        form.put("address.latitude", latitude);
+        form.put("address.longitude", longitude);
+        browser.post("/profile/complete", form);
+        assertThat(browser.get("/profile/addresses")).contains(line1);
+    }
+
+    private Long addressId(String mobile) {
+        Long userId = userRepository.findByMobile(mobile).orElseThrow().getId();
+        return addressRepository.findByUserIdOrderByDefaultAddressDescIdAsc(userId).get(0).getId();
+    }
+
+    private List<CustomerOrder> ordersOf(String mobile) {
+        Long userId = userRepository.findByMobile(mobile).orElseThrow().getId();
+        return orderRepository.findAll().stream()
+                .filter(order -> order.getUser().getId().equals(userId))
+                .collect(Collectors.toList());
+    }
+
+    private CustomerOrder onlyOrderOf(String mobile) {
+        List<CustomerOrder> orders = ordersOf(mobile);
+        assertThat(orders).hasSize(1);
+        return orders.get(0);
+    }
+
+    /** Cookie-aware HTTP client that scrapes the CSRF token out of the rendered page. */
+    private class Browser {
+
+        private final HttpClient client;
+        private String csrfToken;
+
+        Browser() {
+            CookieManager cookies = new CookieManager(null, CookiePolicy.ACCEPT_ALL);
+            this.client = HttpClient.newBuilder().cookieHandler(cookies)
+                    .followRedirects(HttpClient.Redirect.NORMAL).build();
+        }
+
+        String get(String path) throws IOException, InterruptedException {
+            HttpResponse<String> response = client.send(
+                    HttpRequest.newBuilder(uri(path)).GET().build(), HttpResponse.BodyHandlers.ofString());
+            assertThat(response.statusCode()).as("GET %s", path).isEqualTo(200);
+            Matcher matcher = CSRF.matcher(response.body());
+            if (matcher.find()) {
+                csrfToken = matcher.group(1);
+            }
+            return response.body();
+        }
+
+        void post(String path, Map<String, String> form) throws IOException, InterruptedException {
+            Map<String, String> body = new LinkedHashMap<>(form);
+            body.put("_csrf", csrfToken);
+            HttpResponse<String> response = client.send(HttpRequest.newBuilder(uri(path))
+                            .header("Content-Type", "application/x-www-form-urlencoded")
+                            .POST(HttpRequest.BodyPublishers.ofString(encode(body)))
+                            .build(),
+                    HttpResponse.BodyHandlers.ofString());
+            assertThat(response.statusCode()).as("POST %s", path).isEqualTo(200);
+            Matcher matcher = CSRF.matcher(response.body());
+            if (matcher.find()) {
+                csrfToken = matcher.group(1);
+            }
+        }
+
+        private URI uri(String path) {
+            return URI.create("http://localhost:" + port + path);
+        }
+
+        private String encode(Map<String, String> form) {
+            return form.entrySet().stream()
+                    .map(entry -> URLEncoder.encode(entry.getKey(), StandardCharsets.UTF_8) + "="
+                            + URLEncoder.encode(entry.getValue(), StandardCharsets.UTF_8))
+                    .collect(Collectors.joining("&"));
+        }
     }
 
     @TestConfiguration
