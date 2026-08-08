@@ -9,6 +9,7 @@ import com.nilambar.erp.domain.OrderStatus;
 import com.nilambar.erp.domain.Product;
 import com.nilambar.erp.repository.AddressRepository;
 import com.nilambar.erp.repository.CartRepository;
+import com.nilambar.erp.repository.OrderFeedbackRepository;
 import com.nilambar.erp.repository.OrderRepository;
 import com.nilambar.erp.repository.ProductRepository;
 import com.nilambar.erp.repository.UserRepository;
@@ -98,6 +99,9 @@ class RegistrationToOrderIT {
     @Autowired
     private AddressRepository addressRepository;
 
+    @Autowired
+    private OrderFeedbackRepository feedbackRepository;
+
     @Test
     void addressInsideRadiusCanCheckOutWithHomeDelivery() throws Exception {
         Browser browser = new Browser();
@@ -119,6 +123,9 @@ class RegistrationToOrderIT {
 
         String checkout = browser.get("/checkout");
         assertThat(checkout).contains("Home delivery available");
+        assertThat(checkout).contains("11540334561").contains("SBIN0007021");
+        assertThat(browser.getBytes("/checkout/payment-qr.png?addressId=" + addressId(mobile)))
+                .hasSizeGreaterThan(100);
 
         browser.post("/checkout/place", Map.of("addressId", addressId(mobile).toString(),
                 "fulfilmentType", "HOME_DELIVERY"));
@@ -126,19 +133,37 @@ class RegistrationToOrderIT {
         CustomerOrder order = onlyOrderOf(mobile);
         assertThat(order.getFulfilmentType()).isEqualTo(FulfilmentType.HOME_DELIVERY);
         assertThat(order.getItems()).hasSize(1);
-        assertThat(order.getTotal()).isEqualByComparingTo(product.getPrice().multiply(BigDecimal.valueOf(2)));
-        assertThat(order.getDistanceKm()).isLessThanOrEqualTo(5);
+        BigDecimal subtotal = product.getPrice().multiply(BigDecimal.valueOf(2));
+        assertThat(order.getDeliveryFee()).isEqualByComparingTo("30.00");
+        assertThat(order.getTotal()).isEqualByComparingTo(subtotal.add(order.getDeliveryFee()));
+        assertThat(order.getDistanceKm()).isLessThanOrEqualTo(1.5);
         assertThat(productRepository.findById(product.getId()).orElseThrow().getStockQuantity())
                 .isEqualTo(stockBefore - 2);
         assertThat(cartRepository.findByUserId(order.getUser().getId()).orElseThrow().getItems()).isEmpty();
 
         assertThat(browser.get("/orders")).contains(order.getOrderNumber());
-        assertThat(browser.get("/orders/" + order.getId())).contains(product.getName());
+        String detail = browser.get("/orders/" + order.getId());
+        assertThat(detail).contains(product.getName());
+        assertThat(detail).contains("11540334561").contains("once it is delivered");
+        assertThat(browser.getBytes("/orders/" + order.getId() + "/payment-qr.png")).hasSizeGreaterThan(100);
 
         // The Kafka consumer advances the order out of PLACED once it receives order.placed.
         await().atMost(Duration.ofSeconds(30)).untilAsserted(() ->
                 assertThat(orderRepository.findById(order.getId()).orElseThrow().getStatus())
                         .isEqualTo(OrderStatus.CONFIRMED));
+
+        markDelivered(order.getId());
+        browser.get("/orders/" + order.getId());
+        browser.post("/orders/" + order.getId() + "/feedback",
+                Map.of("rating", "5", "comment", "Delivered on time"));
+        assertThat(feedbackRepository.findByOrderId(order.getId()).orElseThrow().getRating()).isEqualTo(5);
+        assertThat(browser.get("/orders/" + order.getId())).contains("Delivered on time");
+    }
+
+    private void markDelivered(Long orderId) {
+        CustomerOrder order = orderRepository.findById(orderId).orElseThrow();
+        order.setStatus(OrderStatus.DELIVERED);
+        orderRepository.save(order);
     }
 
     @Test
@@ -220,6 +245,13 @@ class RegistrationToOrderIT {
             CookieManager cookies = new CookieManager(null, CookiePolicy.ACCEPT_ALL);
             this.client = HttpClient.newBuilder().cookieHandler(cookies)
                     .followRedirects(HttpClient.Redirect.NORMAL).build();
+        }
+
+        byte[] getBytes(String path) throws IOException, InterruptedException {
+            HttpResponse<byte[]> response = client.send(
+                    HttpRequest.newBuilder(uri(path)).GET().build(), HttpResponse.BodyHandlers.ofByteArray());
+            assertThat(response.statusCode()).as("GET %s", path).isEqualTo(200);
+            return response.body();
         }
 
         String get(String path) throws IOException, InterruptedException {

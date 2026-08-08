@@ -50,7 +50,8 @@ class OrderServiceTest {
         paymentService = new MockPaymentService();
 
         ErpProperties properties = new ErpProperties();
-        properties.getDelivery().setFee(new BigDecimal("40.00"));
+        properties.getDelivery().setFeeSlabKm(1.5);
+        properties.getDelivery().setFeePerSlab(new BigDecimal("30.00"));
 
         user = new User();
         user.setId(1L);
@@ -100,8 +101,8 @@ class OrderServiceTest {
 
         assertThat(product.getStockQuantity()).isEqualTo(3);
         assertThat(order.getSubtotal()).isEqualByComparingTo("4998.00");
-        assertThat(order.getDeliveryFee()).isEqualByComparingTo("40.00");
-        assertThat(order.getTotal()).isEqualByComparingTo("5038.00");
+        assertThat(order.getDeliveryFee()).isEqualByComparingTo("60.00");
+        assertThat(order.getTotal()).isEqualByComparingTo("5058.00");
         assertThat(order.getPaymentReference()).startsWith("MOCKPAY-");
         assertThat(order.getDistanceKm()).isEqualTo(2.4);
     }
@@ -158,7 +159,7 @@ class OrderServiceTest {
 
     private void givenQuote(boolean homeDelivery, double distanceKm) {
         DeliveryQuote quote = new DeliveryQuote(homeDelivery, store, distanceKm, 5,
-                homeDelivery ? new BigDecimal("40.00") : BigDecimal.ZERO,
+                homeDelivery ? new BigDecimal("60.00") : BigDecimal.ZERO,
                 homeDelivery ? FulfilmentType.HOME_DELIVERY : FulfilmentType.STORE_PICKUP,
                 homeDelivery ? "Home delivery available." : "This address is beyond the 5 km radius.");
         when(deliveryService.quoteFor(address)).thenReturn(quote);

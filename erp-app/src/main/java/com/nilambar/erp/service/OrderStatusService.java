@@ -17,7 +17,8 @@ public class OrderStatusService {
 
     private static final Logger log = LoggerFactory.getLogger(OrderStatusService.class);
     private static final Set<OrderStatus> OPEN = EnumSet.of(
-            OrderStatus.PLACED, OrderStatus.CONFIRMED, OrderStatus.OUT_FOR_DELIVERY);
+            OrderStatus.PLACED, OrderStatus.CONFIRMED, OrderStatus.OUT_FOR_DELIVERY,
+            OrderStatus.READY_FOR_PICKUP);
 
     private final OrderRepository orderRepository;
     private final Clock clock;

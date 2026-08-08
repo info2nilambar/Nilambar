@@ -112,7 +112,7 @@ public class OrderService {
         }
 
         BigDecimal fee = fulfilment == FulfilmentType.HOME_DELIVERY
-                ? properties.getDelivery().getFee()
+                ? quote.fee()
                 : properties.getDelivery().getPickupFee();
         order.setSubtotal(subtotal);
         order.setDeliveryFee(fee);

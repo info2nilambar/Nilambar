@@ -405,3 +405,21 @@ tbody tr:last-child td {
         grid-template-columns: 1fr;
     }
 }
+
+.payment-qr {
+    width: 200px;
+    height: 200px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: #fff;
+    padding: 6px;
+}
+
+.rating .star {
+    color: #d5d9e4;
+    font-size: 18px;
+}
+
+.rating .star.on {
+    color: #f5a623;
+}

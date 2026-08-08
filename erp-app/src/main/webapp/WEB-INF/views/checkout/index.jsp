@@ -41,6 +41,12 @@
                             <strong>Home delivery available</strong>
                             <p>${quote.nearestStore.name} is ${quote.formattedDistance} km away, within the
                                 ${quote.radiusKm} km radius.</p>
+                            <p class="muted">Delivery charge is
+                                <fmt:formatNumber value="${feePerSlab}" type="currency"
+                                                  currencySymbol="&#8377;" maxFractionDigits="2"/>
+                                per ${feeSlabKm} km slab, so this address costs
+                                <fmt:formatNumber value="${quote.fee}" type="currency"
+                                                  currencySymbol="&#8377;" maxFractionDigits="2"/>.</p>
                         </div>
                     </c:when>
                     <c:otherwise>
@@ -96,6 +102,27 @@
                     <p class="muted">Payment is captured by a mock gateway in this build.</p>
                     <button type="submit">Place order</button>
                 </form>
+            </div>
+
+            <div class="card">
+                <h2 style="margin-top: 0;">Pay to</h2>
+                <table>
+                    <tbody>
+                    <tr><td>Beneficiary</td><td class="right">${payment.payeeName}</td></tr>
+                    <tr><td>Bank</td><td class="right">${payment.bankName}</td></tr>
+                    <tr><td>Account number</td><td class="right">${payment.accountNumber}</td></tr>
+                    <tr><td>IFSC</td><td class="right">${payment.ifsc}</td></tr>
+                    <tr>
+                        <td>Amount payable</td>
+                        <td class="right"><strong><fmt:formatNumber value="${payable}" type="currency"
+                                                                    currencySymbol="&#8377;"
+                                                                    maxFractionDigits="2"/></strong></td>
+                    </tr>
+                    </tbody>
+                </table>
+                <p class="muted">Scan to pay:</p>
+                <img class="payment-qr" alt="Payment QR code"
+                     src="${ctx}/checkout/payment-qr.png?addressId=${selectedAddress.id}"/>
             </div>
         </div>
     </c:otherwise>

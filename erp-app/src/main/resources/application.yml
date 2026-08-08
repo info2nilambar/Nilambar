@@ -53,8 +53,15 @@ erp:
     sender: logging
   delivery:
     radius-km: 5
-    fee: 0.00
+    fee-slab-km: 1.5
+    fee-per-slab: 30.00
     pickup-fee: 0.00
+  payment:
+    payee-name: Nilambar ERP
+    account-number: "11540334561"
+    ifsc: SBIN0007021
+    bank-name: State Bank of India
+    upi-id: ""
   catalog:
     page-size: 12
   kafka:

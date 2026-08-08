@@ -66,6 +66,24 @@ class DeliveryServiceTest {
         assertThat(quote.homeDeliveryAvailable()).isTrue();
     }
 
+    @Test
+    void feeChargesOneSlabForEveryStartedSlabOfDistance() {
+        assertThat(deliveryService.deliveryFee(0.4)).isEqualByComparingTo("30.00");
+        assertThat(deliveryService.deliveryFee(1.5)).isEqualByComparingTo("30.00");
+        assertThat(deliveryService.deliveryFee(1.6)).isEqualByComparingTo("60.00");
+        assertThat(deliveryService.deliveryFee(3.0)).isEqualByComparingTo("60.00");
+        assertThat(deliveryService.deliveryFee(4.9)).isEqualByComparingTo("120.00");
+    }
+
+    @Test
+    void quoteInsideRadiusCarriesTheSlabFee() {
+        DeliveryQuote quote = deliveryService.quote(addressAt(STORE_LAT + 0.0449, STORE_LNG),
+                List.of(store(STORE_LAT, STORE_LNG)));
+
+        assertThat(quote.distanceKm()).isBetween(4.5, 5.0);
+        assertThat(quote.fee()).isEqualByComparingTo("120.00");
+    }
+
     private Address addressAt(double latitude, double longitude) {
         Address address = new Address();
         address.setLatitude(latitude);

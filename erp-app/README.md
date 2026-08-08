@@ -66,7 +66,10 @@ Everything is overridable by environment variable; no secrets live in the repo.
 | `spring.datasource.username` / `.password` | `DB_USERNAME` / `DB_PASSWORD` | `erp` / `erppass` |
 | `spring.kafka.bootstrap-servers` | `KAFKA_BOOTSTRAP_SERVERS` | `localhost:9092` |
 | `erp.delivery.radius-km` | — | `5` |
-| `erp.delivery.fee` / `erp.delivery.pickup-fee` | — | `0.00` |
+| `erp.delivery.fee-per-slab` / `erp.delivery.fee-slab-km` | — | `30.00` / `1.5` |
+| `erp.delivery.pickup-fee` | — | `0.00` |
+| `erp.payment.account-number` / `.ifsc` / `.payee-name` / `.bank-name` | — | `11540334561` / `SBIN0007021` / `Nilambar ERP` / `State Bank of India` |
+| `erp.payment.upi-id` | — | empty (falls back to a bank-transfer QR) |
 | `erp.otp.ttl-minutes` / `.max-attempts` | — | `5` / `5` |
 | `erp.otp.max-requests-per-window` / `.rate-limit-window-minutes` | — | `3` / `15` |
 | `erp.otp.sender` | — | `logging` (`sms` selects the unimplemented gateway stub) |
@@ -94,8 +97,8 @@ users ──< addresses                stores
 
 `OrderEventsConsumer` listens on `erp.order.placed`, skips event ids already in `processed_events`,
 and advances the order status. `OrderProgressScheduler` then walks open orders
-`PLACED → CONFIRMED → OUT_FOR_DELIVERY → DELIVERED` (`READY_FOR_PICKUP` for pickup orders) every
-30 s so the lifecycle is visible without a logistics integration. Publishing failures are logged,
+`PLACED → CONFIRMED → OUT_FOR_DELIVERY → DELIVERED` (`READY_FOR_PICKUP → PICKED_UP` for pickup
+orders) every 30 s so the lifecycle is visible without a logistics integration. Publishing failures are logged,
 never propagated, so a broker outage cannot fail a checkout.
 
 ## Delivery radius
@@ -105,6 +108,26 @@ active store and takes the nearest. Within `erp.delivery.radius-km` home deliver
 otherwise the UI shows the actual distance and only store pickup is selectable. `OrderService`
 recomputes the quote at placement time, so posting `fulfilmentType=HOME_DELIVERY` from a modified
 form is rejected.
+
+The delivery charge is slab-based: `erp.delivery.fee-per-slab` (₹30) is charged for every started
+`erp.delivery.fee-slab-km` (1.5 km) slab, so 0–1.5 km costs ₹30, 1.5–3 km ₹60, and 4.5–5 km ₹120.
+The fee shown on checkout comes from the same `DeliveryService.deliveryFee` call that `OrderService`
+uses when it recomputes the quote, so the browser cannot influence it. Store pickup uses
+`erp.delivery.pickup-fee`.
+
+## Payment details and QR
+
+Checkout and every order page show the collection account (`erp.payment.*`) plus a QR code rendered
+on the fly by `PaymentQrService` (ZXing) at `/checkout/payment-qr.png` and
+`/orders/{id}/payment-qr.png`. The QR encodes a UPI intent when `erp.payment.upi-id` is set,
+otherwise the beneficiary/account/IFSC/amount/reference as plain text. Amounts are always computed
+server-side from the cart or the persisted order, never from a request parameter.
+
+## Customer feedback
+
+Once an order reaches `DELIVERED` or `PICKED_UP`, its detail page offers a 1–5 rating with an
+optional comment, stored one-per-order in `order_feedback` (`FeedbackService` enforces both the
+status precondition and the single-review rule).
 
 ## Product images
 
@@ -122,5 +145,6 @@ python3 tools/generate_catalog.py
 - **SMS delivery** — `LoggingOtpSender` logs the OTP; `SmsGatewayOtpSender` is a placeholder that
   throws until a provider is wired in.
 - **Payments** — `MockPaymentService` always succeeds and returns a `MOCKPAY-…` reference;
-  `setForceFailure(true)` exercises the decline path in tests.
+  `setForceFailure(true)` exercises the decline path in tests. The bank details and QR are shown for
+  a real out-of-band transfer but nothing reconciles them.
 - **Fulfilment** — the status machine is driven by a scheduler, not a courier integration.

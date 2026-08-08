@@ -10,6 +10,7 @@ public class ErpProperties {
     private final Delivery delivery = new Delivery();
     private final Catalog catalog = new Catalog();
     private final Kafka kafka = new Kafka();
+    private final Payment payment = new Payment();
 
     public Otp getOtp() {
         return otp;
@@ -25,6 +26,10 @@ public class ErpProperties {
 
     public Kafka getKafka() {
         return kafka;
+    }
+
+    public Payment getPayment() {
+        return payment;
     }
 
     public static class Otp {
@@ -86,8 +91,25 @@ public class ErpProperties {
 
     public static class Delivery {
         private double radiusKm = 5;
-        private BigDecimal fee = BigDecimal.ZERO;
+        private double feeSlabKm = 1.5;
+        private BigDecimal feePerSlab = new BigDecimal("30.00");
         private BigDecimal pickupFee = BigDecimal.ZERO;
+
+        public double getFeeSlabKm() {
+            return feeSlabKm;
+        }
+
+        public void setFeeSlabKm(double feeSlabKm) {
+            this.feeSlabKm = feeSlabKm;
+        }
+
+        public BigDecimal getFeePerSlab() {
+            return feePerSlab;
+        }
+
+        public void setFeePerSlab(BigDecimal feePerSlab) {
+            this.feePerSlab = feePerSlab;
+        }
 
         public double getRadiusKm() {
             return radiusKm;
@@ -97,20 +119,60 @@ public class ErpProperties {
             this.radiusKm = radiusKm;
         }
 
-        public BigDecimal getFee() {
-            return fee;
-        }
-
-        public void setFee(BigDecimal fee) {
-            this.fee = fee;
-        }
-
         public BigDecimal getPickupFee() {
             return pickupFee;
         }
 
         public void setPickupFee(BigDecimal pickupFee) {
             this.pickupFee = pickupFee;
+        }
+    }
+
+    public static class Payment {
+        private String payeeName = "Nilambar ERP";
+        private String accountNumber = "11540334561";
+        private String ifsc = "SBIN0007021";
+        private String bankName = "State Bank of India";
+        private String upiId = "";
+
+        public String getPayeeName() {
+            return payeeName;
+        }
+
+        public void setPayeeName(String payeeName) {
+            this.payeeName = payeeName;
+        }
+
+        public String getAccountNumber() {
+            return accountNumber;
+        }
+
+        public void setAccountNumber(String accountNumber) {
+            this.accountNumber = accountNumber;
+        }
+
+        public String getIfsc() {
+            return ifsc;
+        }
+
+        public void setIfsc(String ifsc) {
+            this.ifsc = ifsc;
+        }
+
+        public String getBankName() {
+            return bankName;
+        }
+
+        public void setBankName(String bankName) {
+            this.bankName = bankName;
+        }
+
+        public String getUpiId() {
+            return upiId;
+        }
+
+        public void setUpiId(String upiId) {
+            this.upiId = upiId;
         }
     }
 
