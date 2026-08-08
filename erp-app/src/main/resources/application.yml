@@ -1,0 +1,75 @@
+spring:
+  application:
+    name: erp-app
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:dev}
+  datasource:
+    url: ${DB_URL:jdbc:mysql://localhost:3307/erpdb?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC}
+    username: ${DB_USERNAME:erp}
+    password: ${DB_PASSWORD:erppass}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: false
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+    consumer:
+      group-id: erp-app
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: "com.nilambar.erp.event"
+  mvc:
+    view:
+      prefix: /WEB-INF/views/
+      suffix: .jsp
+  servlet:
+    multipart:
+      enabled: false
+
+server:
+  port: ${SERVER_PORT:8080}
+  servlet:
+    session:
+      timeout: 60m
+
+erp:
+  otp:
+    length: 6
+    ttl-minutes: 5
+    max-attempts: 5
+    rate-limit-window-minutes: 15
+    max-requests-per-window: 3
+    sender: logging
+  delivery:
+    radius-km: 5
+    fee-slab-km: 1.5
+    fee-per-slab: 30.00
+    pickup-fee: 0.00
+  payment:
+    payee-name: Nilambar ERP
+    account-number: "11540334561"
+    ifsc: SBIN0007021
+    bank-name: State Bank of India
+    upi-id: ""
+  catalog:
+    page-size: 12
+  kafka:
+    topics:
+      otp-requested: erp.otp.requested
+      user-registered: erp.user.registered
+      order-placed: erp.order.placed
+
+logging:
+  level:
+    com.nilambar.erp: INFO

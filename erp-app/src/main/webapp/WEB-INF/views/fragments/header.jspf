@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>${pageTitle} &middot; Nilambar ERP</title>
+    <link rel="stylesheet" href="${ctx}/css/app.css">
+</head>
+<body>
+<header class="topbar">
+    <a class="brand" href="${ctx}/products">Nilambar<span>ERP</span></a>
+    <nav>
+        <a href="${ctx}/products">Catalog</a>
+        <c:choose>
+            <c:when test="${not empty currentUser}">
+                <a href="${ctx}/cart">Cart <span class="badge">${cartCount}</span></a>
+                <a href="${ctx}/orders">My Orders</a>
+                <a href="${ctx}/profile/addresses">Addresses</a>
+                <form method="post" action="${ctx}/auth/logout" class="inline">
+                    <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}"/>
+                    <button type="submit" class="link-button">Sign out (${currentUser.mobile})</button>
+                </form>
+            </c:when>
+            <c:otherwise>
+                <a class="cta" href="${ctx}/auth/login">Sign in</a>
+            </c:otherwise>
+        </c:choose>
+    </nav>
+</header>
+<main class="container">
+    <c:if test="${not empty infoMessage}">
+        <div class="alert info">${infoMessage}</div>
+    </c:if>
+    <c:if test="${not empty errorMessage}">
+        <div class="alert error">${errorMessage}</div>
+    </c:if>
