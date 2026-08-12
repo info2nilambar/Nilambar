@@ -70,6 +70,8 @@ Everything is overridable by environment variable; no secrets live in the repo.
 | `erp.delivery.pickup-fee` | — | `0.00` |
 | `erp.payment.account-number` / `.ifsc` / `.payee-name` / `.bank-name` | — | `11540334561` / `SBIN0007021` / `Nilambar ERP` / `State Bank of India` |
 | `erp.payment.upi-id` | — | empty (falls back to a bank-transfer QR) |
+| `erp.returns.window-days` | — | `7` |
+| `erp.returns.auto-approve` | — | `true` (`false` leaves returns in `REQUESTED` for manual approval) |
 | `erp.otp.ttl-minutes` / `.max-attempts` | — | `5` / `5` |
 | `erp.otp.max-requests-per-window` / `.rate-limit-window-minutes` | — | `3` / `15` |
 | `erp.otp.sender` | — | `logging` (`sms` selects the unimplemented gateway stub) |
@@ -82,7 +84,8 @@ users ──< addresses                stores
   │                                  │
   ├──── carts ──< cart_items >── products ──< order_items >── orders ──┘
   │
-  └──< orders           otp_codes, otp_request_logs, processed_events
+  └──< orders ──< order_returns ──< return_items >── order_items
+                        otp_codes, otp_request_logs, processed_events, order_feedback
 ```
 
 `processed_events` gives the Kafka consumer idempotency; `otp_request_logs` backs the rate limit.
@@ -94,6 +97,7 @@ users ──< addresses                stores
 | `erp.otp.requested` | an OTP is generated | `{eventId, mobile, channel, requestedAt}` — never the code |
 | `erp.user.registered` | a new user row is created | `{eventId, userId, mobile, registeredAt}` |
 | `erp.order.placed` | an order is committed | `{eventId, orderId, orderNumber, userId, fulfilmentType, distanceKm, total, lines[], placedAt}` |
+| `erp.order.return.requested` | a customer requests a return | `{eventId, returnId, returnNumber, orderId, orderNumber, userId, reason, refundAmount, lines[], requestedAt}` |
 
 `OrderEventsConsumer` listens on `erp.order.placed`, skips event ids already in `processed_events`,
 and advances the order status. `OrderProgressScheduler` then walks open orders
@@ -128,6 +132,17 @@ server-side from the cart or the persisted order, never from a request parameter
 Once an order reaches `DELIVERED` or `PICKED_UP`, its detail page offers a 1–5 rating with an
 optional comment, stored one-per-order in `order_feedback` (`FeedbackService` enforces both the
 status precondition and the single-review rule).
+
+## Item returns
+
+`/orders/{id}/return` lets the customer pick per-item quantities, a reason and an optional comment
+within `erp.returns.window-days` of delivery or pickup. `ReturnService` validates the quantities
+against what is still returnable (ordered quantity minus earlier non-rejected returns), prices the
+refund from the order's unit prices and publishes `erp.order.return.requested`.
+`ReturnEventsConsumer` then settles the return off the request thread — idempotently, keyed on the
+event id — restocking the units and issuing a `MockPaymentService.refund`, which moves the return
+`REQUESTED → APPROVED → REFUNDED`. A failed refund leaves it `APPROVED` with a note, and
+`erp.returns.auto-approve=false` holds every return at `REQUESTED` instead.
 
 ## Product images
 

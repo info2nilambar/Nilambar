@@ -365,9 +365,15 @@ tbody tr:last-child td {
     color: var(--ok);
 }
 
-.status.CANCELLED {
+.status.CANCELLED,
+.status.REJECTED {
     background: #fdecea;
     color: var(--err);
+}
+
+.status.REFUNDED {
+    background: #e7f5ee;
+    color: var(--ok);
 }
 
 .footer {

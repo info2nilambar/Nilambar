@@ -62,6 +62,36 @@
     </div>
 
     <div class="card">
+        <h2 style="margin-top: 0;">Returns</h2>
+        <c:forEach var="orderReturn" items="${returns}">
+            <p>
+                <span class="status ${orderReturn.status}">${orderReturn.status}</span>
+                ${orderReturn.returnNumber} &middot; ${orderReturn.reason.label} &middot;
+                <fmt:formatNumber value="${orderReturn.refundAmount}" type="currency" currencySymbol="&#8377;"
+                                  maxFractionDigits="2"/>
+            </p>
+            <ul class="muted">
+                <c:forEach var="line" items="${orderReturn.items}">
+                    <li>${line.quantity} &times; ${line.orderItem.productName}</li>
+                </c:forEach>
+            </ul>
+            <c:if test="${not empty orderReturn.resolutionNote}">
+                <p class="muted">${orderReturn.resolutionNote}
+                    <c:if test="${not empty orderReturn.refundReference}">
+                        (ref ${orderReturn.refundReference})</c:if></p>
+            </c:if>
+        </c:forEach>
+        <c:choose>
+            <c:when test="${returnAllowed}">
+                <p><a href="${ctx}/orders/${order.id}/return">Return items from this order</a></p>
+            </c:when>
+            <c:when test="${empty returns}">
+                <p class="muted">Items can be returned within ${returnWindowDays} days of delivery or pickup.</p>
+            </c:when>
+        </c:choose>
+    </div>
+
+    <div class="card">
         <h2 style="margin-top: 0;">Your feedback</h2>
         <c:choose>
             <c:when test="${not empty feedback}">

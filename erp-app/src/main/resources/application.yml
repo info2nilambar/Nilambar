@@ -62,6 +62,9 @@ erp:
     ifsc: SBIN0007021
     bank-name: State Bank of India
     upi-id: ""
+  returns:
+    window-days: 7
+    auto-approve: true
   catalog:
     page-size: 12
   kafka:
@@ -69,6 +72,7 @@ erp:
       otp-requested: erp.otp.requested
       user-registered: erp.user.registered
       order-placed: erp.order.placed
+      return-requested: erp.order.return.requested
 
 logging:
   level:

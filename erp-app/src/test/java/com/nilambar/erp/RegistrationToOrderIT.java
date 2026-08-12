@@ -6,10 +6,13 @@ import static org.awaitility.Awaitility.await;
 import com.nilambar.erp.domain.CustomerOrder;
 import com.nilambar.erp.domain.FulfilmentType;
 import com.nilambar.erp.domain.OrderStatus;
+import com.nilambar.erp.domain.OrderReturn;
 import com.nilambar.erp.domain.Product;
+import com.nilambar.erp.domain.ReturnStatus;
 import com.nilambar.erp.repository.AddressRepository;
 import com.nilambar.erp.repository.CartRepository;
 import com.nilambar.erp.repository.OrderFeedbackRepository;
+import com.nilambar.erp.repository.OrderReturnRepository;
 import com.nilambar.erp.repository.OrderRepository;
 import com.nilambar.erp.repository.ProductRepository;
 import com.nilambar.erp.repository.UserRepository;
@@ -25,6 +28,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -102,6 +106,9 @@ class RegistrationToOrderIT {
     @Autowired
     private OrderFeedbackRepository feedbackRepository;
 
+    @Autowired
+    private OrderReturnRepository returnRepository;
+
     @Test
     void addressInsideRadiusCanCheckOutWithHomeDelivery() throws Exception {
         Browser browser = new Browser();
@@ -158,11 +165,30 @@ class RegistrationToOrderIT {
                 Map.of("rating", "5", "comment", "Delivered on time"));
         assertThat(feedbackRepository.findByOrderId(order.getId()).orElseThrow().getRating()).isEqualTo(5);
         assertThat(browser.get("/orders/" + order.getId())).contains("Delivered on time");
+
+        // Returning one of the two delivered units refunds it and puts it back on the shelf.
+        int stockAfterOrder = productRepository.findById(product.getId()).orElseThrow().getStockQuantity();
+        assertThat(browser.get("/orders/" + order.getId() + "/return")).contains("Return items");
+        browser.post("/orders/" + order.getId() + "/return",
+                Map.of("reason", "DAMAGED", "comment", "One box arrived dented",
+                        "quantity_" + order.getItems().get(0).getId(), "1"));
+
+        OrderReturn orderReturn = returnRepository.findByOrderIdOrderByIdDesc(order.getId()).get(0);
+        assertThat(orderReturn.getRefundAmount()).isEqualByComparingTo(product.getPrice());
+        await().atMost(Duration.ofSeconds(30)).untilAsserted(() -> {
+            assertThat(returnRepository.findById(orderReturn.getId()).orElseThrow().getStatus())
+                    .isEqualTo(ReturnStatus.REFUNDED);
+            assertThat(productRepository.findById(product.getId()).orElseThrow().getStockQuantity())
+                    .isEqualTo(stockAfterOrder + 1);
+        });
+        assertThat(browser.get("/orders/" + order.getId()))
+                .contains(orderReturn.getReturnNumber()).contains("REFUNDED");
     }
 
     private void markDelivered(Long orderId) {
         CustomerOrder order = orderRepository.findById(orderId).orElseThrow();
         order.setStatus(OrderStatus.DELIVERED);
+        order.setUpdatedAt(Instant.now());
         orderRepository.save(order);
     }
 
