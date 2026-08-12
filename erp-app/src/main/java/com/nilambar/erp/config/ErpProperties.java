@@ -11,6 +11,7 @@ public class ErpProperties {
     private final Catalog catalog = new Catalog();
     private final Kafka kafka = new Kafka();
     private final Payment payment = new Payment();
+    private final Returns returns = new Returns();
 
     public Otp getOtp() {
         return otp;
@@ -30,6 +31,10 @@ public class ErpProperties {
 
     public Payment getPayment() {
         return payment;
+    }
+
+    public Returns getReturns() {
+        return returns;
     }
 
     public static class Otp {
@@ -128,6 +133,27 @@ public class ErpProperties {
         }
     }
 
+    public static class Returns {
+        private int windowDays = 7;
+        private boolean autoApprove = true;
+
+        public int getWindowDays() {
+            return windowDays;
+        }
+
+        public void setWindowDays(int windowDays) {
+            this.windowDays = windowDays;
+        }
+
+        public boolean isAutoApprove() {
+            return autoApprove;
+        }
+
+        public void setAutoApprove(boolean autoApprove) {
+            this.autoApprove = autoApprove;
+        }
+    }
+
     public static class Payment {
         private String payeeName = "Nilambar ERP";
         private String accountNumber = "11540334561";
@@ -199,6 +225,15 @@ public class ErpProperties {
             private String otpRequested = "erp.otp.requested";
             private String userRegistered = "erp.user.registered";
             private String orderPlaced = "erp.order.placed";
+            private String returnRequested = "erp.order.return.requested";
+
+            public String getReturnRequested() {
+                return returnRequested;
+            }
+
+            public void setReturnRequested(String returnRequested) {
+                this.returnRequested = returnRequested;
+            }
 
             public String getOtpRequested() {
                 return otpRequested;

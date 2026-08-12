@@ -31,6 +31,20 @@ public class MockPaymentService implements PaymentService {
         return PaymentResult.success(reference);
     }
 
+    @Override
+    public PaymentResult refund(Long userId, String orderNumber, BigDecimal amount) {
+        if (forceFailure) {
+            log.info("Mock refund forced to fail for order {}", orderNumber);
+            return PaymentResult.failure("Refund declined by mock gateway.");
+        }
+        if (amount == null || amount.signum() <= 0) {
+            return PaymentResult.failure("Invalid refund amount.");
+        }
+        String reference = "MOCKRFND-" + UUID.randomUUID().toString().substring(0, 12).toUpperCase();
+        log.info("Mock refund of {} issued for order {} (ref {})", amount, orderNumber, reference);
+        return PaymentResult.success(reference);
+    }
+
     public void setForceFailure(boolean forceFailure) {
         this.forceFailure = forceFailure;
     }
