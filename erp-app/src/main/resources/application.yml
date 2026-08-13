@@ -64,6 +64,9 @@ erp:
     upi-id: ""
   catalog:
     page-size: 12
+  dashboard:
+    seed-demo-data: ${ERP_SEED_DEMO_DATA:true}
+    default-window-days: 30
   kafka:
     topics:
       otp-requested: erp.otp.requested

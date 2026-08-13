@@ -19,7 +19,7 @@ public class SecurityConfig {
                         // JSP views live under /WEB-INF and are reached by a FORWARD dispatch.
                         .dispatcherTypeMatchers(DispatcherType.FORWARD, DispatcherType.INCLUDE, DispatcherType.ERROR)
                         .permitAll()
-                        .requestMatchers("/", "/auth/**", "/products", "/products/**", "/css/**", "/js/**", "/images/**", "/error")
+                        .requestMatchers("/", "/auth/**", "/products", "/products/**", "/dashboard", "/dashboard/**", "/css/**", "/js/**", "/images/**", "/error")
                         .permitAll()
                         .anyRequest().authenticated())
                 .formLogin(login -> login.loginPage("/auth/login").permitAll().disable())

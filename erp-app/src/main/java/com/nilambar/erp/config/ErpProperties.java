@@ -11,6 +11,11 @@ public class ErpProperties {
     private final Catalog catalog = new Catalog();
     private final Kafka kafka = new Kafka();
     private final Payment payment = new Payment();
+    private final Dashboard dashboard = new Dashboard();
+
+    public Dashboard getDashboard() {
+        return dashboard;
+    }
 
     public Otp getOtp() {
         return otp;
@@ -173,6 +178,28 @@ public class ErpProperties {
 
         public void setUpiId(String upiId) {
             this.upiId = upiId;
+        }
+    }
+
+    public static class Dashboard {
+        /** Seeds operational demo data (staff, vendors, stock ledger, order history) when empty. */
+        private boolean seedDemoData = true;
+        private int defaultWindowDays = 30;
+
+        public boolean isSeedDemoData() {
+            return seedDemoData;
+        }
+
+        public void setSeedDemoData(boolean seedDemoData) {
+            this.seedDemoData = seedDemoData;
+        }
+
+        public int getDefaultWindowDays() {
+            return defaultWindowDays;
+        }
+
+        public void setDefaultWindowDays(int defaultWindowDays) {
+            this.defaultWindowDays = defaultWindowDays;
         }
     }
 
