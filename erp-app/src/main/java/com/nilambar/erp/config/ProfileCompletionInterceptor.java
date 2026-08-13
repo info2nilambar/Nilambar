@@ -23,7 +23,7 @@ public class ProfileCompletionInterceptor implements HandlerInterceptor {
             throws Exception {
         String path = request.getRequestURI().substring(request.getContextPath().length());
         if (path.startsWith("/profile/complete") || path.startsWith("/auth") || path.startsWith("/products")
-                || path.startsWith("/css") || path.startsWith("/js") || path.startsWith("/images")
+                || path.startsWith("/dashboard") || path.startsWith("/css") || path.startsWith("/js") || path.startsWith("/images")
                 || path.startsWith("/error")) {
             return true;
         }

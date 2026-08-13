@@ -76,6 +76,7 @@ class RegistrationToOrderIT {
         registry.add("spring.datasource.password", MYSQL::getPassword);
         registry.add("spring.kafka.bootstrap-servers", KAFKA::getBootstrapServers);
         registry.add("erp.fulfilment.simulate", () -> "false");
+        registry.add("erp.dashboard.seed-demo-data", () -> "false");
     }
 
     @LocalServerPort

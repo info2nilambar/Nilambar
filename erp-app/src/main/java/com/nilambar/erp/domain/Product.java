@@ -8,6 +8,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
 import java.math.BigDecimal;
+import java.time.Instant;
 
 @Entity
 @Table(name = "products")
@@ -35,6 +36,15 @@ public class Product {
     @Column(name = "stock_quantity", nullable = false)
     private int stockQuantity;
 
+    @Column(name = "unit_cost", nullable = false, precision = 12, scale = 2)
+    private BigDecimal unitCost = BigDecimal.ZERO;
+
+    @Column(name = "reorder_level", nullable = false)
+    private int reorderLevel;
+
+    @Column(name = "last_restocked_at")
+    private Instant lastRestockedAt;
+
     @Column(name = "image_path", nullable = false, length = 255)
     private String imagePath;
 
@@ -47,6 +57,10 @@ public class Product {
 
     public boolean isInStock() {
         return stockQuantity > 0;
+    }
+
+    public boolean isLowStock() {
+        return stockQuantity > 0 && stockQuantity <= reorderLevel;
     }
 
     public Long getId() {
@@ -103,6 +117,30 @@ public class Product {
 
     public void setStockQuantity(int stockQuantity) {
         this.stockQuantity = stockQuantity;
+    }
+
+    public BigDecimal getUnitCost() {
+        return unitCost;
+    }
+
+    public void setUnitCost(BigDecimal unitCost) {
+        this.unitCost = unitCost;
+    }
+
+    public int getReorderLevel() {
+        return reorderLevel;
+    }
+
+    public void setReorderLevel(int reorderLevel) {
+        this.reorderLevel = reorderLevel;
+    }
+
+    public Instant getLastRestockedAt() {
+        return lastRestockedAt;
+    }
+
+    public void setLastRestockedAt(Instant lastRestockedAt) {
+        this.lastRestockedAt = lastRestockedAt;
     }
 
     public String getImagePath() {

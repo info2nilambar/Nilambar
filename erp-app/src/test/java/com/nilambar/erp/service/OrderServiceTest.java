@@ -18,6 +18,7 @@ import com.nilambar.erp.domain.User;
 import com.nilambar.erp.messaging.EventPublisher;
 import com.nilambar.erp.repository.OrderRepository;
 import com.nilambar.erp.repository.ProductRepository;
+import com.nilambar.erp.repository.StockMovementRepository;
 import com.nilambar.erp.service.delivery.DeliveryQuote;
 import com.nilambar.erp.service.delivery.DeliveryService;
 import com.nilambar.erp.service.payment.MockPaymentService;
@@ -88,7 +89,8 @@ class OrderServiceTest {
         when(productRepository.findByIdForUpdate(100L)).thenReturn(Optional.of(product));
         when(orderRepository.save(any(CustomerOrder.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        orderService = new OrderService(orderRepository, productRepository, cartService, addressService,
+        orderService = new OrderService(orderRepository, productRepository, mock(StockMovementRepository.class),
+                cartService, addressService,
                 deliveryService, paymentService, mock(EventPublisher.class), properties,
                 Clock.fixed(Instant.parse("2026-01-01T10:00:00Z"), ZoneOffset.UTC));
     }

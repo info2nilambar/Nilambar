@@ -9,11 +9,14 @@ import com.nilambar.erp.domain.FulfilmentType;
 import com.nilambar.erp.domain.OrderItem;
 import com.nilambar.erp.domain.OrderStatus;
 import com.nilambar.erp.domain.Product;
+import com.nilambar.erp.domain.StockMovement;
+import com.nilambar.erp.domain.StockMovementType;
 import com.nilambar.erp.domain.User;
 import com.nilambar.erp.event.OrderPlacedEvent;
 import com.nilambar.erp.messaging.EventPublisher;
 import com.nilambar.erp.repository.OrderRepository;
 import com.nilambar.erp.repository.ProductRepository;
+import com.nilambar.erp.repository.StockMovementRepository;
 import com.nilambar.erp.service.delivery.DeliveryQuote;
 import com.nilambar.erp.service.delivery.DeliveryService;
 import com.nilambar.erp.service.payment.PaymentResult;
@@ -31,6 +34,7 @@ public class OrderService {
 
     private final OrderRepository orderRepository;
     private final ProductRepository productRepository;
+    private final StockMovementRepository stockMovementRepository;
     private final CartService cartService;
     private final AddressService addressService;
     private final DeliveryService deliveryService;
@@ -41,6 +45,7 @@ public class OrderService {
 
     public OrderService(OrderRepository orderRepository,
                         ProductRepository productRepository,
+                        StockMovementRepository stockMovementRepository,
                         CartService cartService,
                         AddressService addressService,
                         DeliveryService deliveryService,
@@ -50,6 +55,7 @@ public class OrderService {
                         Clock clock) {
         this.orderRepository = orderRepository;
         this.productRepository = productRepository;
+        this.stockMovementRepository = stockMovementRepository;
         this.cartService = cartService;
         this.addressService = addressService;
         this.deliveryService = deliveryService;
@@ -109,6 +115,7 @@ public class OrderService {
             order.addItem(orderItem);
 
             subtotal = subtotal.add(orderItem.getLineTotal());
+            stockMovementRepository.save(outMovement(product, cartItem.getQuantity(), order.getOrderNumber()));
         }
 
         BigDecimal fee = fulfilment == FulfilmentType.HOME_DELIVERY
@@ -150,6 +157,17 @@ public class OrderService {
     public CustomerOrder require(User user, Long orderId) {
         return orderRepository.findByIdAndUserId(orderId, user.getId())
                 .orElseThrow(() -> new BusinessException("Order not found."));
+    }
+
+    private StockMovement outMovement(Product product, int quantity, String orderNumber) {
+        StockMovement movement = new StockMovement();
+        movement.setProduct(product);
+        movement.setMovementType(StockMovementType.OUT);
+        movement.setQuantity(quantity);
+        movement.setUnitCost(product.getUnitCost());
+        movement.setOccurredAt(clock.instant());
+        movement.setReference(orderNumber);
+        return movement;
     }
 
     private String generateOrderNumber() {
