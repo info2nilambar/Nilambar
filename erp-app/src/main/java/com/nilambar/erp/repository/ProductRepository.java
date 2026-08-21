@@ -25,6 +25,10 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     @Query("select distinct p.category from Product p where p.active = true order by p.category")
     List<String> findCategories();
 
+    Optional<Product> findBySku(String sku);
+
+    List<Product> findByCategory(String category);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select p from Product p where p.id = :id")
     Optional<Product> findByIdForUpdate(@Param("id") Long id);
