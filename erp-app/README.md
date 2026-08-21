@@ -1,7 +1,7 @@
 # Nilambar ERP — Ordering Application
 
 ERP-style e-commerce ordering application: mobile-OTP registration, address book with coordinates,
-a 50-product catalog, cart and checkout, and a 5 km home-delivery rule enforced server-side.
+a 70-product catalog, cart and checkout, and a 5 km home-delivery rule enforced server-side.
 
 **Stack:** Java 17 · Spring Boot 3.2 · Spring MVC + JSP/JSTL · Spring Security · Spring Data JPA ·
 Flyway · MySQL 8 · Apache Kafka · Maven (`war` packaging).
@@ -20,7 +20,7 @@ docker compose up -d          # MySQL on :3307, Kafka on :9092
 mvn spring-boot:run           # http://localhost:8080
 ```
 
-Flyway applies the schema and seed data (2 stores, 50 products) on the first start.
+Flyway applies the schema and seed data (2 stores, 70 products including 10 vegetables and 10 fruits) on the first start.
 
 > **Packaging note:** JSPs cannot be served from an executable fat jar, so the module is packaged as
 > a `war` with `spring-boot-starter-tomcat` and `tomcat-embed-jasper` in `provided` scope.
