@@ -104,6 +104,17 @@ class RegistrationToOrderIT {
     private OrderFeedbackRepository feedbackRepository;
 
     @Test
+    void freshProduceIsSeededAndBrowsable() throws Exception {
+        assertThat(productRepository.findByCategory("Vegetables")).hasSize(10);
+        assertThat(productRepository.findByCategory("Fruits")).hasSize(10);
+        assertThat(productRepository.findCategories()).contains("Vegetables", "Fruits");
+
+        Browser browser = new Browser();
+        assertThat(browser.get("/products?category=Vegetables")).contains("Tomato 1 kg");
+        assertThat(browser.get("/products?category=Fruits")).contains("Mango 1 kg");
+    }
+
+    @Test
     void addressInsideRadiusCanCheckOutWithHomeDelivery() throws Exception {
         Browser browser = new Browser();
         String mobile = "9800000001";
